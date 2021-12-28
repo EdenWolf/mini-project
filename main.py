@@ -49,7 +49,7 @@ class TaskModel(db.Model):
 
 
 # creating the DB- this should happen only once!
-db.create_all()
+# db.create_all()
 
 
 person_post_args = reqparse.RequestParser()
