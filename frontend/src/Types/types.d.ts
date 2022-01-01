@@ -9,6 +9,7 @@ interface IPersonData {
     name: string;
     email: string;
     favoriteProgrammingLanguage: string;
+    activeTaskCount: number;
     id: string;
 }
 

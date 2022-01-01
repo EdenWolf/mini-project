@@ -18,6 +18,7 @@ export default function Person({ id, patchPerson, deletePerson }: IProps) {
     email: "",
     favoriteProgrammingLanguage: "",
   });
+  const [personData, setPersonData] = useState<IPersonData>();
 
   const [isPatch, setIsPatch] = useState<boolean>(false);
 
@@ -27,6 +28,7 @@ export default function Person({ id, patchPerson, deletePerson }: IProps) {
     async function getPerson() {
       const result: IPersonData = await Calls.getPerson(id);
       setFormValues(result);
+      setPersonData(result);
     }
     getPerson();
   }, [id]);
@@ -86,6 +88,7 @@ export default function Person({ id, patchPerson, deletePerson }: IProps) {
           <Field>{formValues.email}</Field>
           <Field>{formValues.favoriteProgrammingLanguage}</Field>
           <Field>{id}</Field>
+          <Field>Active Tasks: {personData?.activeTaskCount}</Field>
         </div>
       )}
       <TaskList id={id} />

@@ -16,10 +16,19 @@ export default function TaskList({ id }: IProps) {
   const [forceUpdate, setForceUpdate] = useState<boolean>(false);
   const [openTaskDetails, setOpenTaskDetails] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string>("");
+  const [showActive, setShowActive] = useState<boolean>(false);
+  const [showDone, setShowDone] = useState<boolean>(false);
 
   useEffect(() => {
     async function getTasks() {
-      const result: ITaskData[] = await Calls.getPersonTasks(id);
+      let result: ITaskData[];
+      if (showActive) {
+        result = await Calls.getPersonActiveTasks(id);
+      } else if (showDone) {
+        result = await Calls.getPersonDoneTasks(id);
+      } else {
+        result = await Calls.getPersonTasks(id);
+      }
       setTasks(result);
     }
     getTasks();
@@ -59,9 +68,35 @@ export default function TaskList({ id }: IProps) {
     update();
   };
 
+  const handleShowActive = () => {
+    if (showDone) setShowDone(false);
+    setShowActive(true);
+    update();
+  };
+
+  const handleShowDone = () => {
+    if (showActive) setShowActive(false);
+    setShowDone(true);
+    update();
+  };
+
   return (
     <div>
       <Tasks>Tasks:</Tasks>
+      <Button
+        variant={showActive ? "contained" : "text"}
+        onClick={handleShowActive}
+        style={{ textTransform: "none" }}
+      >
+        Active
+      </Button>
+      <Button
+        variant={showDone ? "contained" : "text"}
+        onClick={handleShowDone}
+        style={{ textTransform: "none" }}
+      >
+        Done
+      </Button>
       <TasksContainer>
         <ButtonGroup orientation="vertical">
           {tasks.map((task, index) => (

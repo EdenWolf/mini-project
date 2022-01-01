@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE = "http://127.0.0.1:8009/";
+const BASE = "http://127.0.0.1:9000/api/";
 
 const Endpoints = {
   people: "people/",
@@ -78,6 +78,18 @@ async function getPersonTasks(id: string) {
   return await get(Endpoints.people + id + "/" + Endpoints.tasks);
 }
 
+async function getPersonActiveTasks(id: string) {
+  return await get(
+    Endpoints.people + id + "/" + Endpoints.tasks + "?status=active"
+  );
+}
+
+async function getPersonDoneTasks(id: string) {
+  return await get(
+    Endpoints.people + id + "/" + Endpoints.tasks + "?status=done"
+  );
+}
+
 async function postPersonTasks(id: string, data: any) {
   return await post(Endpoints.people + id + "/" + Endpoints.tasks, data);
 }
@@ -117,6 +129,8 @@ export const Calls = {
   patchPerson,
   deletePerson,
   getPersonTasks,
+  getPersonActiveTasks,
+  getPersonDoneTasks,
   postPersonTasks,
   getTask,
   patchTask,
