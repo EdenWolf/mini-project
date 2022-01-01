@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
-from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
+from flask_restful import Api, reqparse, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS, cross_origin
-
+import datetime
 
 import uuid
 
@@ -125,20 +125,63 @@ def createJSONTask(data):
     }
 
 
-@app.route('/people/', methods=['POST', 'GET'])
+def abort_if_email_already_exists(email):
+    if PeopleModel.query.filter_by(email=email).first():
+        abort(
+            400, message=f"A person with email '{email}' already exists.")
+
+
+def abort_if_person_dont_exists(result):
+    if not result:
+        abort(404, message=f"A person with the id {id} does not exist.")
+
+
+def abort_if_task_dont_exists(result):
+    if not result:
+        abort(404, message=f"A task with the id {id} does not exist.")
+
+
+def abort_if_task_data_makes_no_sense(value, field):
+    abort(400, message=f"value '{value}' is not a legal task {field}.")
+
+
+def create_new_person_id():
+    new_id = str(uuid.uuid4())
+    # make sure it is a new ID.
+    while (PeopleModel.query.filter_by(id=new_id).first()):
+        new_id = str(uuid.uuid4())
+    return new_id
+
+
+def create_new_task_id():
+    new_id = str(uuid.uuid4())
+    # make sure it is a new ID.
+    while (TaskModel.query.filter_by(id=new_id).first()):
+        new_id = str(uuid.uuid4())
+    return new_id
+
+
+def check_status(status):
+    if status != "active" and status != "done":
+        abort_if_task_data_makes_no_sense(status, 'status')
+
+
+def checkDate(date):
+    try:
+        datetime.datetime.strptime(date, '%Y-%m-%d')
+    except ValueError:
+        abort_if_task_data_makes_no_sense(date, 'dueDate')
+
+
+@app.route('/api/people/', methods=['POST', 'GET'])
 @cross_origin()
 def postOrGetAllPeople():
     if request.method == 'POST':
         # if POST- Add a new person to the system.
         args = person_post_args.parse_args()
-        if PeopleModel.query.filter_by(email=args['email']).first():
-            abort(
-                400, message=f"A person with email '{email}' already exists.")
-        new_id = str(uuid.uuid4())
-        # make sure it is a new ID.
-        while (PeopleModel.query.filter_by(id=new_id).first()):
-            new_id = str(uuid.uuid4())
+        abort_if_email_already_exists(args['email'])
 
+        new_id = create_new_person_id()
         person = PeopleModel(id=new_id, name=args['name'], email=args['email'], activeTaskCount=0,
                              favoriteProgrammingLanguage=args['favoriteProgrammingLanguage'])
         db.session.add(person)
@@ -155,15 +198,14 @@ def postOrGetAllPeople():
         return jsonify(list)
 
 
-@app.route('/people/<string:id>', methods=['PATCH', 'DELETE', 'GET'])
+@app.route('/api/people/<string:id>', methods=['PATCH', 'DELETE', 'GET'])
 @cross_origin()
 def getPerson(id):
     if request.method == 'PATCH':
         # if PATCH- update person details.
         args = person_patch_args.parse_args()
         result = PeopleModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A person with the id {id} does not exist.")
+        abort_if_person_dont_exists(result)
 
         if args['name']:
             result.name = args['name']
@@ -178,41 +220,54 @@ def getPerson(id):
     elif request.method == 'DELETE':
         # if DELETE- Remove the person whose id is provided fron the system.
         result = PeopleModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A person with the id {id} does not exist.")
+        abort_if_person_dont_exists(result)
 
+        tasks = TaskModel.query.filter_by(ownerId=id)
+        for task in tasks:
+            db.session.delete(task)
         db.session.delete(result)
         db.session.commit()
         return 'Person removed successfully.', 200
     else:
         # if GET- Get a detailed description of the person whose id is provided.
         result = PeopleModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A person with the id {id} does not exist.")
+        abort_if_person_dont_exists(result)
         return createJSONPerson(result)
 
 
-@app.route('/people/<string:id>/tasks/', methods=['POST', 'GET'])
+@app.route('/api/people/<string:id>/tasks/', methods=['POST', 'GET'])
 @cross_origin()
 def personTasks(id):
     if request.method == 'POST':
         # Add a new task to the person URL.
         args = task_post_args.parse_args()
-        # TODO: check date
-        # TODO: check if person with the id exists
-        # TODO: check status
-        new_id = str(uuid.uuid4())
-        # make sure it is a new ID.
-        while (TaskModel.query.filter_by(id=new_id).first()):
-            new_id = str(uuid.uuid4())
+        checkDate(args['dueDate'])
+        person = PeopleModel.query.filter_by(id=id).first()
+        abort_if_person_dont_exists(person)
+        check_status(args['status'])
+        new_id = create_new_task_id()
         task = TaskModel(
             id=new_id, title=args['title'], details=args['details'], dueDate=args['dueDate'], status=args['status'], ownerId=id)
+
+        # update activeTaskCount
+        activeTaskCount = person.activeTaskCount
+        if (args['status'] == 'active'):
+            person.activeTaskCount = activeTaskCount+1
+
         db.session.add(task)
         db.session.commit()
         return 'Task created and assigned successfully', 201
     else:
         # Get an array of relevant tasks that belong to the person.
+        person = PeopleModel.query.filter_by(id=id).first()
+        abort_if_person_dont_exists(person)
+        status = request.args.get('status')
         result = TaskModel.query.filter_by(ownerId=id)
+
+        if status:
+            check_status(status)
+            result = result.filter_by(status=status)
+
         list = []
         if result:
             for data in result:
@@ -220,25 +275,30 @@ def personTasks(id):
         return jsonify(list)
 
 
-@app.route('/tasks/<string:id>', methods=['PATCH', 'DELETE', 'GET'])
+@app.route('/api/tasks/<string:id>', methods=['PATCH', 'DELETE', 'GET'])
 @cross_origin()
 def task(id):
     if request.method == 'PATCH':
         # Partial update of task details.
         args = task_patch_args.parse_args()
-        # TODO: check date
-        # TODO: check status
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
-
+        abort_if_task_dont_exists(result)
         if args['title']:
             result.title = args['title']
         if args['details']:
             result.details = args['details']
         if args['dueDate']:
+            checkDate(args['dueDate'])
             result.dueDate = args['dueDate']
         if args['status']:
+            check_status(args['status'])
+            # update activeTaskCount
+            person = PeopleModel.query.filter_by(id=result.ownerId).first()
+            activeTaskCount = person.activeTaskCount
+            if result.status != 'active' and args['status'] == 'active':
+                person.activeTaskCount = activeTaskCount+1
+            if result.status == 'active' and args['status'] != 'active':
+                person.activeTaskCount = activeTaskCount-1
             result.status = args['status']
 
         db.session.commit()
@@ -247,8 +307,13 @@ def task(id):
     elif request.method == 'DELETE':
         # Remove a task from the system.
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
+        abort_if_task_dont_exists(result)
+
+        # update activeTaskCount
+        if result.status == 'active':
+            person = PeopleModel.query.filter_by(id=result.ownerId).first()
+            activeTaskCount = person.activeTaskCount
+            person.activeTaskCount = activeTaskCount-1
 
         db.session.delete(result)
         db.session.commit()
@@ -256,20 +321,28 @@ def task(id):
     else:
         # Provide the details of the task whose id is provided.
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
+        abort_if_task_dont_exists(result)
         return createJSONTask(result)
 
 
-@app.route('/tasks/<string:id>/status', methods=['PUT', 'GET'])
+@app.route('/api/tasks/<string:id>/status', methods=['PUT', 'GET'])
 @cross_origin()
 def taskStatus(id):
     if request.method == 'PUT':
-        # TODO: Set a task's status.
+        # Set a task's status.
         args = task_status_put_args.parse_args()
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
+        abort_if_task_dont_exists(result)
+        check_status(args['status'])
+
+        # update activeTaskCount
+        person = PeopleModel.query.filter_by(id=result.ownerId).first()
+        activeTaskCount = person.activeTaskCount
+        if result.status != 'active' and args['status'] == 'active':
+            person.activeTaskCount = activeTaskCount+1
+        if result.status == 'active' and args['status'] != 'active':
+            person.activeTaskCount = activeTaskCount-1
+
         result.status = args['status']
 
         db.session.commit()
@@ -278,21 +351,32 @@ def taskStatus(id):
     else:
         # Get the status of the task.
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
+        abort_if_task_dont_exists(result)
         return result.status, 200
 
 
-@app.route('/tasks/<string:id>/owner', methods=['PUT', 'GET'])
+@app.route('/api/tasks/<string:id>/owner', methods=['PUT', 'GET'])
 @cross_origin()
 def taskOwner(id):
     if request.method == 'PUT':
-        # TODO: Set a task's owner.
+        # Set a task's owner.
         args = task_owner_put_args.parse_args()
         print("NOT IMPLEENTED YET")
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
+        abort_if_task_dont_exists(result)
+        person = PeopleModel.query.filter_by(id=args['ownerId']).first()
+        abort_if_person_dont_exists(person)
+
+        # update activeTaskCount
+        activeTaskCount = person.activeTaskCount
+        if result.status == 'active':
+            person.activeTaskCount = activeTaskCount+1
+
+        prevOwner = PeopleModel.query.filter_by(id=result.ownerId).first()
+        activeTaskCount = person.activeTaskCount
+        if result.status == 'active':
+            prevOwner.activeTaskCount = activeTaskCount-1
+
         result.ownerId = args['ownerId']
 
         db.session.commit()
@@ -301,10 +385,9 @@ def taskOwner(id):
     else:
         # Get a task's owner id.
         result = TaskModel.query.filter_by(id=id).first()
-        if not result:
-            abort(404, message=f"A task with the id {id} does not exist.")
+        abort_if_task_dont_exists(result)
         return result.ownerId, 200
 
 
 if __name__ == "__main__":
-    app.run(port=8009, debug=True)
+    app.run(port=9000, debug=True)
