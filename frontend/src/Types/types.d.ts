@@ -1,7 +1,7 @@
 interface IPersonPostValues {
-    name: string;
-    email: string;
-    favoriteProgrammingLanguage: string;
+    name?: string;
+    email?: string;
+    favoriteProgrammingLanguage?: string;
 }
   
 

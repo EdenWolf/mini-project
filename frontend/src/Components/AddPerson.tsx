@@ -8,9 +8,9 @@ interface IProps {
 
 export default function AddPerson({ postNewPerson }: IProps) {
   const initFormValues: IPersonPostValues = {
-    name: "",
-    email: "",
-    favoriteProgrammingLanguage: "",
+    name: undefined,
+    email: undefined,
+    favoriteProgrammingLanguage: undefined,
   };
 
   const [formValues, setFormValues] =

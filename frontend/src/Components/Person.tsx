@@ -14,9 +14,9 @@ interface IProps {
 
 export default function Person({ id, patchPerson, deletePerson }: IProps) {
   const [formValues, setFormValues] = useState<IPersonPostValues>({
-    name: "",
-    email: "",
-    favoriteProgrammingLanguage: "",
+    name: undefined,
+    email: undefined,
+    favoriteProgrammingLanguage: undefined,
   });
   const [personData, setPersonData] = useState<IPersonData>();
 

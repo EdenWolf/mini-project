@@ -83,20 +83,22 @@ export default function TaskList({ id }: IProps) {
   return (
     <div>
       <Tasks>Tasks:</Tasks>
-      <Button
-        variant={showActive ? "contained" : "text"}
-        onClick={handleShowActive}
-        style={{ textTransform: "none" }}
-      >
-        Active
-      </Button>
-      <Button
-        variant={showDone ? "contained" : "text"}
-        onClick={handleShowDone}
-        style={{ textTransform: "none" }}
-      >
-        Done
-      </Button>
+      <StyledButtonGroup>
+        <Button
+          variant={showActive ? "contained" : "text"}
+          onClick={handleShowActive}
+          style={{ textTransform: "none" }}
+        >
+          Active
+        </Button>
+        <Button
+          variant={showDone ? "contained" : "text"}
+          onClick={handleShowDone}
+          style={{ textTransform: "none" }}
+        >
+          Done
+        </Button>
+      </StyledButtonGroup>
       <TasksContainer>
         <ButtonGroup orientation="vertical">
           {tasks.map((task, index) => (
@@ -139,4 +141,8 @@ const TasksContainer = styled.div`
 
 const Tasks = styled.h2`
   color: #6a7281;
+`;
+
+const StyledButtonGroup = styled.div`
+  margin-bottom: 20px;
 `;
